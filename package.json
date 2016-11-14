@@ -1,0 +1,10 @@
+{
+  "name": "fast-promise",
+  "version": "1.0.1",
+  "description": "",
+  "main": "dist/Promise.js",
+  "typings": "dist/Promise.d.ts",
+  "keywords": [],
+  "author": "cevek",
+  "license": "ISC"
+}

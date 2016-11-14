@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "lib": ["es6", "dom"],
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": false
+  },
+  "files": [
+    "src/Promise.ts"
+  ]
+}
