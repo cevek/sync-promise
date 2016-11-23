@@ -139,7 +139,7 @@ export default class FastPromise<T> {
 
     then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): FastPromise<TResult1 | TResult2>;
     then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>, onrejected: (reason: any) => TResult | PromiseLike<TResult>): FastPromise<TResult>;
-    then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>): Promise<TResult>;
+    then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>): FastPromise<TResult>;
     then<R, Arg>(onFulfill?: FastPromiseCallback<R, T, Arg>, onReject?: FastPromiseCallback<R, T, Arg>, thisArg?: FastPromiseThis, arg?: Arg): FastPromise<R>;
     then(): FastPromise<T>;
     then<R, Arg>(onFulfill?: FastPromiseCallback<R, T, Arg>, onReject?: FastPromiseCallback<R, T, Arg>, thisArg?: FastPromiseThis, arg?: Arg): FastPromise<R> {
@@ -158,7 +158,7 @@ export default class FastPromise<T> {
         return p;
     }
 
-    catch(onrejected: (reason: any) => T | PromiseLike<T>): Promise<T>;
+    catch(onrejected: (reason: any) => T | PromiseLike<T>): FastPromise<T>;
     catch<R, Arg>(onReject: FastPromiseCallback<R, T, Arg>, thisArg?: FastPromiseThis, arg?: Arg): FastPromise<R> {
         return this.then(null, onReject, thisArg, arg);
     }

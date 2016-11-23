@@ -1,6 +1,6 @@
 {
   "name": "fast-promise",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "main": "dist/Promise.js",
   "typings": "dist/Promise.d.ts",
