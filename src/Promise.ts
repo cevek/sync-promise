@@ -10,6 +10,8 @@ export const enum FastPromiseState{
     CANCELLED
 }
 
+const NativePromise: typeof Promise = typeof Promise == 'function' ? Promise : (function(){} as any);
+
 export default class FastPromise<T> {
     static readonly [Symbol.species]: Function;
     readonly [Symbol.toStringTag]: "Promise";
@@ -41,7 +43,7 @@ export default class FastPromise<T> {
             newValue.then(this.resolveWithoutCallback, this.reject, this);
             return this;
         }
-        if (newValue instanceof Promise) {
+        if (newValue instanceof NativePromise) {
             newValue.then(val => this.resolveWithoutCallback(val), err => this.reject(err));
             return this;
         }
