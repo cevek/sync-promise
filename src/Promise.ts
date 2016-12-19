@@ -78,7 +78,11 @@ export default class FastPromise<T> {
                     if (unhandledRejection) {
                         unhandledRejection(this.value);
                     } else {
-                        throw new Error("Uncaught in promise: " + this.value);
+                        if (this.value instanceof Error) {
+                            throw this.value;
+                        } else {
+                            throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
+                        }
                     }
                 }
             });
