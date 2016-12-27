@@ -10,7 +10,7 @@ export const enum FastPromiseState{
     CANCELLED
 }
 
-const NativePromise: typeof Promise = typeof Promise == 'function' ? Promise : (function(){} as any);
+const NativePromise: typeof Promise = typeof Promise == 'function' ? Promise : (function () {} as any);
 
 export default class FastPromise<T> {
     static readonly [Symbol.species]: Function;
@@ -24,9 +24,9 @@ export default class FastPromise<T> {
 
     protected onFulfill: FastPromiseCallback<any, T, any>;
     protected onReject: FastPromiseCallback<any, T, any>;
-    protected onCancelCallback: Opt<()=>void>;
+    protected onCancelCallback: Opt<() => void>;
 
-    constructor(executor?: (resolve: (val?: T | FastPromise<T>)=>void, reject: (err?: T | Error) => void)=>void) {
+    constructor(executor?: (resolve: (val?: T | FastPromise<T>) => void, reject: (err?: T | Error) => void) => void) {
         if (executor) {
             executor(val => this.resolve(val), err => this.reject(err!))
         }
@@ -61,32 +61,51 @@ export default class FastPromise<T> {
         }
     }
 
+    protected rejectWithoutCallback(value: T, setResolved?: boolean) {
+        if (this.state !== FastPromiseState.CANCELLED) {
+            this.value = value;
+            this.state = setResolved ? FastPromiseState.RESOLVED : FastPromiseState.REJECTED;
+            if (this.children) {
+                this.runChildren();
+            } else {
+                const unhandledRejection = FastPromise.unhandledRejection;
+                setTimeout(() => {
+                    if (!this.children && !this.onReject) {
+                        if (unhandledRejection) {
+                            unhandledRejection(this.value);
+                        } else {
+                            if (this.value instanceof Error) {
+                                throw this.value;
+                            } else {
+                                throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
     reject(reason: T | Error) {
         if (this.state !== FastPromiseState.PENDING) {
             return this;
         }
-        this.value = this.onReject
-            ? (this.thisArg ? this.onReject.call(this.thisArg, reason, this.arg) : this.onReject(reason as T, this.arg))
-            : reason;
-        this.state = FastPromiseState.REJECTED;
-        if (this.children) {
-            this.runChildren();
+        let newValue: T | Error;
+        if (this.onReject) {
+            newValue = (this.thisArg ? this.onReject.call(this.thisArg, reason, this.arg) : this.onReject(reason as T, this.arg))
         } else {
-            const unhandledRejection = FastPromise.unhandledRejection;
-            setTimeout(() => {
-                if (!this.children && !this.onReject) {
-                    if (unhandledRejection) {
-                        unhandledRejection(this.value);
-                    } else {
-                        if (this.value instanceof Error) {
-                            throw this.value;
-                        } else {
-                            throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
-                        }
-                    }
-                }
-            });
+            newValue = reason;
         }
+
+        if (newValue instanceof FastPromise) {
+            newValue.then(this.resolve, this.rejectWithoutCallback, this);
+            return this;
+        }
+        if (newValue instanceof NativePromise) {
+            newValue.then(val => this.resolve(val), err => this.rejectWithoutCallback(err));
+            return this;
+        }
+        this.rejectWithoutCallback(newValue as T, !!this.onReject);
         return this;
     }
 
@@ -119,7 +138,7 @@ export default class FastPromise<T> {
         }
     }
 
-    onCancel(callback: Opt<()=>void>) {
+    onCancel(callback: Opt<() => void>) {
         this.onCancelCallback = callback;
     }
 
@@ -136,11 +155,21 @@ export default class FastPromise<T> {
     protected resolveOrReject(parentPromise: FastPromise<any>) {
         if (parentPromise.state == FastPromiseState.CANCELLED) {
             this.cancel();
-        } else if (parentPromise.state == FastPromiseState.REJECTED && !parentPromise.onReject) {
-            this.reject(parentPromise.value as T);
-        } else {
-            this.resolve(parentPromise.value as T);
+            return;
         }
+        if (parentPromise.state == FastPromiseState.REJECTED) {
+            this.reject(parentPromise.value as T);
+            return;
+        }
+        if (parentPromise.value instanceof FastPromise) {
+            parentPromise.value.then(this.resolveWithoutCallback, this.rejectWithoutCallback, this);
+            return;
+        }
+        if (parentPromise.value instanceof NativePromise) {
+            parentPromise.value.then(val => this.resolveWithoutCallback(val), err => this.rejectWithoutCallback(err));
+            return;
+        }
+        this.resolve(parentPromise.value as T);
     }
 
     then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): FastPromise<TResult1 | TResult2>;

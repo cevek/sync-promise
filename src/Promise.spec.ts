@@ -1,4 +1,4 @@
-import {FastPromise} from "./Promise";
+import FastPromise from "./Promise";
 type Opt<T> = T | undefined | void | null;
 
 function check(val: any, expected: any) {
@@ -51,7 +51,7 @@ function test4() {
 function test5() {
     const calls: number[] = [];
     const p = new FastPromise<number>();
-    p.then(val => new FastPromise().resolve(val + 2))
+    p.then(val => new FastPromise<number>().resolve(val + 2))
         .catch(val => 30)
         .then(val => calls.push(val));
 
@@ -63,7 +63,7 @@ function test6() {
     const calls: number[] = [];
     const p = new FastPromise<number>();
     p
-        .then(val => new FastPromise().reject(val + 10))
+        .then(val => new FastPromise<number>().reject(val + 10))
         .catch((val: number) => {
             calls.push(val);
             return 7
@@ -328,6 +328,18 @@ function test25() {
         check(calls, [2]);
     }, 20);
 }
+function test26() {
+    const calls: number[] = [];
+    const errCalls: number[] = [];
+    const p = FastPromise.reject(1);
+    p
+        .then(val => val, err => FastPromise.reject(2))
+        .then(val => calls.push(val), err => errCalls.push(err))
+    check(calls, []);
+    check(errCalls, [2]);
+    p.then(null, err => err);
+}
+
 
 test1();
 test2();
@@ -354,3 +366,4 @@ test22();
 test23();
 test24();
 test25();
+test26();
