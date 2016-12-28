@@ -16,6 +16,37 @@ export default class FastPromise<T> {
     static readonly [Symbol.species]: Function;
     readonly [Symbol.toStringTag]: "Promise";
 
+    protected static promiseStack: FastPromise<any>[] = [];
+    protected static promiseStackPos = 0;
+    protected static promiseRunnerInWork = false;
+
+    protected static addPromiseChildrenToStack(promise: FastPromise<{}>) {
+        if (promise.children) {
+            for (let i = 0; i < promise.children.length; i++) {
+                const childPromise = promise.children[i];
+                this.promiseStack[this.promiseStackPos] = promise;
+                this.promiseStack[this.promiseStackPos + 1] = childPromise;
+                this.promiseStackPos += 2;
+            }
+        }
+        this.promiseRunner();
+    }
+
+    protected static promiseRunner() {
+        if (this.promiseRunnerInWork) {
+            return;
+        }
+        this.promiseRunnerInWork = true;
+        let promiseStack = this.promiseStack;
+        for (let i = 0; i < this.promiseStackPos; i += 2) {
+            const parentPromise = promiseStack[i];
+            const promise = promiseStack[i + 1];
+            promise.resolveOrReject(parentPromise);
+        }
+        this.promiseStackPos = 0;
+        this.promiseRunnerInWork = false;
+    }
+
     protected value: Opt<T> = null;
     protected state = FastPromiseState.PENDING;
     protected children: Opt<FastPromise<any>[]> = null;
@@ -62,9 +93,7 @@ export default class FastPromise<T> {
         if (this.state !== FastPromiseState.CANCELLED) {
             this.value = value;
             this.state = FastPromiseState.RESOLVED;
-            if (this.children) {
-                this.runChildren();
-            }
+            FastPromise.addPromiseChildrenToStack(this);
         }
     }
 
@@ -73,7 +102,7 @@ export default class FastPromise<T> {
             this.value = value;
             this.state = setResolved ? FastPromiseState.RESOLVED : FastPromiseState.REJECTED;
             if (this.children) {
-                this.runChildren();
+                FastPromise.addPromiseChildrenToStack(this);
             } else {
                 this.throwUnhandledRejection();
             }
@@ -161,15 +190,6 @@ export default class FastPromise<T> {
         }
     }
 
-    protected runChildren() {
-        if (this.children) {
-            for (let i = 0; i < this.children.length; i++) {
-                const child = this.children[i];
-                child.resolveOrReject(this);
-            }
-        }
-    }
-
     protected resolveOrReject(parentPromise: FastPromise<any>) {
         if (parentPromise.state == FastPromiseState.CANCELLED) {
             this.cancel();
@@ -201,10 +221,13 @@ export default class FastPromise<T> {
         if (!this.children) {
             this.children = [];
         }
-        this.children.push(p);
         if (this.state !== FastPromiseState.PENDING) {
-            p.resolveOrReject(this);
+            this.children = [];
+            this.children.push(p);
+            FastPromise.addPromiseChildrenToStack(this);
         }
+        this.children.push(p);
+
         return p;
     }
 
@@ -296,4 +319,4 @@ interface PAllContext {
 
 
 // tests
-// import './Promise.spec';
+import './Promise.spec';
