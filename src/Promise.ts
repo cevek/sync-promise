@@ -28,27 +28,34 @@ export default class FastPromise<T> {
 
     constructor(executor?: (resolve: (val?: T | FastPromise<T>) => void, reject: (err?: T | Error) => void) => void) {
         if (executor) {
-            executor(val => this.resolve(val), err => this.reject(err!))
+            this.callExecutor(executor);
         }
+    }
+
+    protected callExecutor(executor: (resolve: (val?: T | FastPromise<T>) => void, reject: (err?: T | Error) => void) => void) {
+        executor(val => this.resolve(val), err => this.reject(err!))
     }
 
     resolve(value?: T | FastPromise<T>) {
         if (this.state !== FastPromiseState.PENDING) {
             return this;
         }
-        const newValue = this.onFulfill
-            ? (this.thisArg ? this.onFulfill.call(this.thisArg, value, this.arg) : this.onFulfill(value as T, this.arg))
-            : value;
-        if (newValue instanceof FastPromise) {
-            newValue.then(this.resolveWithoutCallback, this.reject, this);
-            return this;
+        let newValue: any;
+        if (this.onFulfill) {
+            newValue = this.onFulfill.call(this.thisArg, value, this.arg);
+        } else {
+            newValue = value;
         }
-        if (newValue instanceof NativePromise) {
-            newValue.then(val => this.resolveWithoutCallback(val), err => this.reject(err));
+        if (this.valueIsPromise(newValue)) {
+            this.valueAsPromise(newValue);
             return this;
         }
         this.resolveWithoutCallback(newValue as T);
         return this;
+    }
+
+    protected otherThen(promise: PromiseLike<any>) {
+        promise.then(val => this.resolveWithoutCallback(val), err => this.rejectWithoutCallback(err));
     }
 
     protected resolveWithoutCallback(value: T) {
@@ -68,41 +75,41 @@ export default class FastPromise<T> {
             if (this.children) {
                 this.runChildren();
             } else {
-                const unhandledRejection = FastPromise.unhandledRejection;
-                setTimeout(() => {
-                    if (!this.children && !this.onReject) {
-                        if (unhandledRejection) {
-                            unhandledRejection(this.value);
-                        } else {
-                            if (this.value instanceof Error) {
-                                throw this.value;
-                            } else {
-                                throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
-                            }
-                        }
-                    }
-                });
+                this.throwUnhandledRejection();
             }
         }
+    }
+
+    protected throwUnhandledRejection() {
+        const unhandledRejection = FastPromise.unhandledRejection;
+        setTimeout(() => {
+            if (!this.children && this.state === FastPromiseState.REJECTED) {
+                if (unhandledRejection) {
+                    unhandledRejection(this.value);
+                } else {
+                    if (this.value instanceof Error) {
+                        throw this.value;
+                    } else {
+                        throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
+                    }
+                }
+            }
+        });
     }
 
     reject(reason: T | Error) {
         if (this.state !== FastPromiseState.PENDING) {
             return this;
         }
-        let newValue: T | Error;
+        let newValue: any;
         if (this.onReject) {
-            newValue = (this.thisArg ? this.onReject.call(this.thisArg, reason, this.arg) : this.onReject(reason as T, this.arg))
+            newValue = this.onReject.call(this.thisArg, reason, this.arg);
         } else {
             newValue = reason;
         }
 
-        if (newValue instanceof FastPromise) {
-            newValue.then(this.resolve, this.rejectWithoutCallback, this);
-            return this;
-        }
-        if (newValue instanceof NativePromise) {
-            newValue.then(val => this.resolve(val), err => this.rejectWithoutCallback(err));
+        if (this.valueIsPromise(newValue)) {
+            this.valueAsPromise(newValue);
             return this;
         }
         this.rejectWithoutCallback(newValue as T, !!this.onReject);
@@ -142,6 +149,17 @@ export default class FastPromise<T> {
         this.onCancelCallback = callback;
     }
 
+    protected valueIsPromise(value: any) {
+        return typeof value === 'object' && value !== null && typeof value.then === 'function';
+    }
+
+    protected valueAsPromise(value: FastPromise<any>) {
+        if (value.then === FastPromise.prototype.then) {
+            value.then(this.resolveWithoutCallback, this.rejectWithoutCallback, this);
+        } else {
+            this.otherThen(value);
+        }
+    }
 
     protected runChildren() {
         if (this.children) {
@@ -157,19 +175,16 @@ export default class FastPromise<T> {
             this.cancel();
             return;
         }
+        const value = parentPromise.value;
         if (parentPromise.state == FastPromiseState.REJECTED) {
-            this.reject(parentPromise.value as T);
+            this.reject(value as T);
             return;
         }
-        if (parentPromise.value instanceof FastPromise) {
-            parentPromise.value.then(this.resolveWithoutCallback, this.rejectWithoutCallback, this);
-            return;
+        if (this.valueIsPromise(value)) {
+            this.valueAsPromise(value);
+            return this;
         }
-        if (parentPromise.value instanceof NativePromise) {
-            parentPromise.value.then(val => this.resolveWithoutCallback(val), err => this.rejectWithoutCallback(err));
-            return;
-        }
-        this.resolve(parentPromise.value as T);
+        this.resolve(value as T);
     }
 
     then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): FastPromise<TResult1 | TResult2>;
