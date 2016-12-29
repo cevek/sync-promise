@@ -4,7 +4,7 @@ type Opt<T> = T | undefined | void | null;
 function check(val: any, expected: any) {
     for (let i = 0; i < Math.max(val.length, expected.length); i++) {
         if (val[i] !== expected[i]) {
-            console.error('Test failed', i, val, expected, val[i], expected[i]);
+            console.error(`Test failed at array pos ${i}, expected: ${JSON.stringify(expected)}, given: ${JSON.stringify(val)}`);
         }
     }
 }
