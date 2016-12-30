@@ -175,27 +175,45 @@ export default class FastPromise<T> {
             this.value = value;
             this.state = setResolved ? FastPromiseState.RESOLVED : FastPromiseState.REJECTED;
             if (this.children === void 0 && this.firstChild === void 0 && this.state === FastPromiseState.REJECTED) {
-                this.throwUnhandledRejection();
+                FastPromise.throwUnhandledRejection(this);
             }
             this.addToStack();
         }
     }
 
-    protected throwUnhandledRejection() {
-        const unhandledRejection = FastPromise.unhandledRejection;
-        setTimeout(() => {
-            if (this.children === void 0 && this.firstChild === void 0 && this.state === FastPromiseState.REJECTED) {
-                if (unhandledRejection) {
-                    unhandledRejection(this.value);
+    protected static timeoutSended = false;
+    protected static unhandledPromisesList = [];
+    protected static unhandledPromisesLen = 0;
+
+    protected static throwUnhandledRejectionCallback() {
+        for (let i = 0; i < FastPromise.unhandledPromisesLen; i++) {
+            const promise = FastPromise.unhandledPromisesList[i];
+            if (promise.children === void 0 && promise.firstChild === void 0 && promise.state === FastPromiseState.REJECTED) {
+                if (FastPromise.unhandledRejection) {
+                    FastPromise.unhandledRejection(promise.value);
                 } else {
-                    if (this.value instanceof Error) {
-                        throw this.value;
+                    if (promise.value instanceof Error) {
+                        throw promise.value;
                     } else {
-                        throw new Error("Uncaught in promise with error: " + JSON.stringify(this.value));
+                        throw new Error("Uncaught in promise with error: " + JSON.stringify(promise.value));
                     }
                 }
             }
-        });
+            FastPromise.unhandledPromisesList[i] = null;
+        }
+        for (let i = FastPromise.unhandledPromisesLen; i < FastPromise.unhandledPromisesList.length; i++) {
+            FastPromise.unhandledPromisesList[i] = null;
+        }
+        FastPromise.unhandledPromisesLen = 0;
+        FastPromise.timeoutSended = false;
+    }
+
+    protected static throwUnhandledRejection(promise: FastPromise<any>) {
+        FastPromise.unhandledPromisesList[FastPromise.unhandledPromisesLen++] = promise;
+        if (!FastPromise.timeoutSended) {
+            setTimeout(FastPromise.throwUnhandledRejectionCallback);
+            FastPromise.timeoutSended = true;
+        }
     }
 
     reject(reason: T | Error) {
@@ -407,11 +425,7 @@ if (!console.profile) {
     console.profileEnd = function () {}
 }
 
-const blobIdP = FastPromise.resolve(true);
-const fileP = FastPromise.resolve(true);
-const createQuery = () => FastPromise.resolve(true);
-const insert = () => FastPromise.resolve(true);
-const whereUpdate = () => FastPromise.resolve(true);
+
 /*
 function dd() {
     return FastPromise.reject(2);
@@ -437,7 +451,13 @@ for (let i = 0; i < 500; i++) {
     p.then(nextThen).then(nextThen)
 }*/
 
-// import "./Promise.spec";
+import "./Promise.spec";
+
+const blobIdP = FastPromise.resolve(true);
+const fileP = FastPromise.resolve(true);
+const createQuery = () => FastPromise.resolve(true);
+const insert = () => FastPromise.resolve(true);
+const whereUpdate = () => FastPromise.resolve(true);
 
 console.profile('perf');
 console.time('perf');
@@ -446,6 +466,8 @@ for (let i = 0; i < 100000; i++) {
 }
 console.timeEnd('perf');
 (console as any).profileEnd('perf');
+
+
 
 function abc() {
     FastPromise.all([blobIdP, fileP]).then(function (result) {

@@ -323,9 +323,9 @@ function test25() {
     const calls: number[] = [];
     FastPromise.onUnhandledRejection(val => {calls.push(val)});
     FastPromise.reject(2);
-    FastPromise.onUnhandledRejection(null);
     setTimeout(() => {
         check(test25, calls, [2]);
+        FastPromise.onUnhandledRejection(null);
     }, 20);
 }
 function test26() {
