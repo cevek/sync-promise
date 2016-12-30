@@ -41,7 +41,7 @@ namespace F {
 
     let promises: any = [];
 
-    class FastPromise<T> {
+    export default class FastPromise<T> {
         static readonly [Symbol.species]: Function;
         readonly [Symbol.toStringTag]: "Promise";
 
@@ -51,9 +51,16 @@ namespace F {
 
         protected addToStack() {
             let ps = FastPromise.promiseStack;
+            let pos = FastPromise.promiseStackPos;
             let ch = this.children;
+            if (this.firstChild) {
+                ps[pos] = this;
+                ps[pos + 1] = this.firstChild;
+                pos += 2;
+                this.firstChild = null;
+                FastPromise.x(pos);
+            }
             if (ch) {
-                let pos = FastPromise.promiseStackPos;
                 for (let i = 0; i < ch.len; i++) {
                     const childPromise = ch.items[i];
                     ps[pos] = this;
@@ -119,6 +126,7 @@ namespace F {
 
         protected value: Opt<T> = null;
         protected state = FastPromiseState.PENDING;
+        protected firstChild: FastPromise<any>;
         protected children: CacheItem = null;
         protected thisArg: FastPromiseThis;
         protected arg: any;
@@ -148,7 +156,7 @@ namespace F {
                 if (newValue.then === FastPromise.prototype.then) {
                     newValue.innerThen(this);
                 } else {
-                    this.otherThen(newValue);
+                    newValue.then(this.resolveWithoutCallback.bind(this), this.rejectWithoutCallback.bind(this));
                 }
                 return this;
             }
@@ -177,15 +185,18 @@ namespace F {
         protected innerThen(childPromise: FastPromise<any>) {
             childPromise.doNext = true;
             if (this.state !== FastPromiseState.PENDING) {
-                this.children = getChildren();
-                this.children.Push(childPromise);
+                this.firstChild = childPromise;
                 this.addToStack();
                 return;
             }
-            if (!this.children) {
-                this.children = getChildren();
+            if (this.firstChild) {
+                if (!this.children) {
+                    this.children = getChildren();
+                }
+                this.children.Push(childPromise);
+            } else {
+                this.firstChild = childPromise;
             }
-            this.children.Push(childPromise);
         }
 
         protected otherThen(promise: PromiseLike<any>) {
@@ -213,7 +224,7 @@ namespace F {
                 this.value = value;
                 this.state = setResolved ? FastPromiseState.RESOLVED : FastPromiseState.REJECTED;
                 this.addToStack();
-                if (this.children && this.children.len === 0 && this.state === FastPromiseState.REJECTED) {
+                if (!this.children && !this.firstChild && this.state === FastPromiseState.REJECTED) {
                     this.throwUnhandledRejection();
                 }
             }
@@ -222,7 +233,7 @@ namespace F {
         protected throwUnhandledRejection() {
             const unhandledRejection = FastPromise.unhandledRejection;
             setTimeout(() => {
-                if (this.children && this.children.len === 0 && this.state === FastPromiseState.REJECTED) {
+                if (!this.children && !this.firstChild && this.state === FastPromiseState.REJECTED) {
                     if (unhandledRejection) {
                         unhandledRejection(this.value);
                     } else {
@@ -278,16 +289,20 @@ namespace F {
         cancel() {
             //todo: use stack
             this.state = FastPromiseState.CANCELLED;
-            restoreCache(this.children);
-            this.children = null;
             if (this.onCancelCallback) {
                 this.onCancelCallback();
+            }
+            if (this.firstChild) {
+                this.firstChild.cancel();
+                this.firstChild = null;
             }
             if (this.children) {
                 for (let i = 0; i < this.children.len; i++) {
                     const child = this.children.items[i];
                     child.cancel();
                 }
+                restoreCache(this.children);
+                this.children = null;
             }
         }
 
@@ -346,15 +361,19 @@ namespace F {
             p.thisArg = thisArg;
             p.arg = arg;
             if (this.state !== FastPromiseState.PENDING) {
-                this.children = getChildren();
-                this.children.Push(p);
+                this.firstChild = p;
                 this.addToStack();
                 return p;
             }
-            if (!this.children) {
-                this.children = getChildren();
+            if (this.firstChild) {
+                if (!this.children) {
+                    this.children = getChildren();
+                }
+                this.children.Push(p);
+            } else {
+                this.firstChild = p;
             }
-            this.children.Push(p);
+
             return p;
         }
 
@@ -455,13 +474,13 @@ namespace F {
     const insert = () => FastPromise.resolve(true);
     const whereUpdate = () => FastPromise.resolve(true);
 
-    console.profile('perf');
+    // console.profile('perf');
     console.time('perf');
     for (let i = 0; i < 100000; i++) {
         abc();
     }
     console.timeEnd('perf');
-    (console as any).profileEnd('perf');
+    // (console as any).profileEnd('perf');
 
     function abc() {
         FastPromise.all([blobIdP, fileP]).then(function (result) {
@@ -478,9 +497,9 @@ namespace F {
         });
     }
 
-    console.log(x);
-    console.log(restored);
-    console.log(promises);
+    // console.log(x);
+    // console.log(restored);
+    // console.log(promises);
 
 }
 
