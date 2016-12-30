@@ -1,10 +1,10 @@
 import FastPromise from "./Promise";
 type Opt<T> = T | undefined | void | null;
 
-function check(val: any, expected: any) {
+function check(fn: ()=>void, val: any, expected: any) {
     for (let i = 0; i < Math.max(val.length, expected.length); i++) {
         if (val[i] !== expected[i]) {
-            console.error(`Test failed at array pos ${i}, expected: ${JSON.stringify(expected)}, given: ${JSON.stringify(val)}`);
+            console.error(`Test failed at array pos ${i}, expected: ${JSON.stringify(expected)}, given: ${JSON.stringify(val)} on ${(fn as any).name}`);
         }
     }
 }
@@ -15,7 +15,7 @@ function test1() {
     p.then(val => calls.push(val));
 
     p.resolve(1);
-    check(calls, [1]);
+    check(test1, calls, [1]);
 }
 
 function test2() {
@@ -23,7 +23,7 @@ function test2() {
     const p = new FastPromise<number>();
     p.then(val => calls.push(val)).catch(() => null);
     p.reject(1);
-    check(calls, []);
+    check(test2, calls, []);
 }
 
 
@@ -34,7 +34,7 @@ function test3() {
         .then(val => calls.push(val));
 
     p.reject(1);
-    check(calls, [2]);
+    check(test3, calls, [2]);
 }
 
 function test4() {
@@ -45,7 +45,7 @@ function test4() {
         .then(val => calls.push(val));
 
     p.reject(1);
-    check(calls, [3]);
+    check(test4, calls, [3]);
 }
 
 function test5() {
@@ -56,7 +56,7 @@ function test5() {
         .then(val => calls.push(val));
 
     p.resolve(1);
-    check(calls, [3]);
+    check(test5, calls, [3]);
 }
 
 function test6() {
@@ -71,7 +71,7 @@ function test6() {
         .then(val => calls.push(val));
 
     p.resolve(1);
-    check(calls, [11, 7]);
+    check(test6, calls, [11, 7]);
 }
 
 function test7() {
@@ -85,7 +85,7 @@ function test7() {
         .then(val => calls.push(val));
 
     p.resolve(1);
-    check(calls, [1, 2, 2]);
+    check(test7, calls, [1, 2, 2]);
 }
 
 function test8() {
@@ -105,7 +105,7 @@ function test8() {
         .then(val => calls.push(val));
 
     p.resolve(1);
-    check(calls, [3, 7, 4, 3]);
+    check(test8, calls, [3, 7, 4, 3]);
 }
 
 function test9() {
@@ -118,7 +118,7 @@ function test9() {
         return rr;
     }).then(val => calls.push(val));
     p.resolve(1);
-    check(calls, [3]);
+    check(test9, calls, [3]);
 }
 
 function test10() {
@@ -131,7 +131,7 @@ function test10() {
 
     p.resolve(1);
     pp.resolve(5);
-    check(calls, [5]);
+    check(test10, calls, [5]);
 }
 
 function test11() {
@@ -140,7 +140,7 @@ function test11() {
     p.resolve(1);
     p.then(val => calls.push(val));
     p.then(val => calls.push(val));
-    check(calls, [1, 1]);
+    check(test11, calls, [1, 1]);
 }
 
 function test12() {
@@ -153,7 +153,7 @@ function test12() {
 
     p.resolve(1);
     pp.reject(5);
-    check(calls, [6]);
+    check(test12, calls, [6]);
 }
 
 function test13() {
@@ -168,7 +168,7 @@ function test13() {
     p.resolve(1);
     pp.resolve(ppp);
     ppp.resolve(5);
-    check(calls, [5]);
+    check(test13, calls, [5]);
 }
 function sleeFastPromise(ms: number, val?: number) {
     const p = new FastPromise<number>();
@@ -184,7 +184,7 @@ function test14() {
         3,
         sleeFastPromise(20).then(() => 4),
     ]).then(arr => {
-        check(arr, [0, 1, 2, 3, 4]);
+        check(test14, arr, [0, 1, 2, 3, 4]);
     });
 }
 function test15() {
@@ -195,7 +195,7 @@ function test15() {
         FastPromise.resolve(2),
         3,
     ]).then(val => {
-        check([val], [1]);
+        check(test15, [val], [1]);
     });
 }
 function test16() {
@@ -229,7 +229,7 @@ function test17() {
         })
         .then(v => {
             calls.push(v);
-            check(calls, [1, 11, 21])
+            check(test17, calls, [1, 11, 21])
         })
 }
 
@@ -241,9 +241,9 @@ function test18() {
         3,
         sleeFastPromise(20).then(() => 4),
     ]).then(arr => {
-        check(arr, []);
+        check(test18, arr, []);
     }).catch(val => {
-        check([val], 2);
+        check(test18, [val], 2);
     })
 }
 
@@ -255,9 +255,9 @@ function test19() {
         3,
         sleeFastPromise(20).then(() => 4),
     ]).then(arr => {
-        check(arr, []);
+        check(test19, arr, []);
     }).catch(val => {
-        check([val], 2);
+        check(test19, [val], 2);
     })
 }
 
@@ -269,7 +269,7 @@ function test20() {
     p.cancel();
     p.then(val => calls.push(val)).then(val => calls.push(val));
     p.resolve(1);
-    check(calls, []);
+    check(test20, calls, []);
 }
 
 function test21() {
@@ -281,7 +281,7 @@ function test21() {
     pp.cancel();
     pp.then(val => calls.push(val)).then(val => calls.push(val));
     p.resolve(1);
-    check(calls, [1]);
+    check(test21, calls, [1]);
 }
 
 function test22() {
@@ -290,7 +290,7 @@ function test22() {
     p.then(val => sleeFastPromise(10, 10).then(val => calls.push(val)));
     p.cancel();
     p.resolve(1);
-    check(calls, []);
+    check(test22, calls, []);
 }
 
 function test23() {
@@ -306,7 +306,7 @@ function test23() {
     if (pp) {
         pp.then(val => {
             calls.push(val);
-            check(calls, [10, 20])
+            check(test23, calls, [10, 20])
         });
     }
 }
@@ -317,7 +317,7 @@ function test24() {
     pp.then(a => calls.push(a));
     pp.resolve(1);
     p.resolve(2);
-    check(calls, [1]);
+    check(test24, calls, [1]);
 }
 function test25() {
     const calls: number[] = [];
@@ -325,7 +325,7 @@ function test25() {
     FastPromise.reject(2);
     FastPromise.onUnhandledRejection(null);
     setTimeout(() => {
-        check(calls, [2]);
+        check(test25, calls, [2]);
     }, 20);
 }
 function test26() {
@@ -335,8 +335,8 @@ function test26() {
     p
         .then(val => val, err => FastPromise.reject(2))
         .then(val => calls.push(val), err => errCalls.push(err))
-    check(calls, []);
-    check(errCalls, [2]);
+    check(test26, calls, []);
+    check(test26, errCalls, [2]);
     p.then(null, err => err);
 }
 
