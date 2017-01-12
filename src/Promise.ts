@@ -7,10 +7,12 @@ export const enum FastPromiseState{
     PENDING,
     RESOLVED,
     REJECTED,
-    CANCELLED
+    CANCELLED,
 }
 
+
 // test in browser
+declare const exports: any;
 if (typeof exports == 'undefined') {
     (window as any).module = {exports: {}};
     (window as any).exports = {};
@@ -19,13 +21,14 @@ if (typeof exports == 'undefined') {
 
 export default class FastPromise<T> {
     static readonly [Symbol.species]: Function;
-    readonly [Symbol.toStringTag]: "Promise";
+    readonly [Symbol.toStringTag]: 'Promise';
 
     protected static promiseStack: FastPromise<any>[] = [];
     protected static promiseStackPos = 0;
     protected static promiseRunnerInWork = false;
 
     protected addToStack() {
+
         let ps = FastPromise.promiseStack;
         let pos = FastPromise.promiseStackPos;
         if (this.firstChild) {
@@ -114,7 +117,7 @@ export default class FastPromise<T> {
 
     constructor(executor?: (resolve: (val?: T | FastPromise<T>) => void, reject: (err?: T | Error) => void) => void) {
         if (executor) {
-            executor(this.resolve.bind(this), this.reject.bind(this))
+            executor(this.resolve.bind(this), this.reject.bind(this));
         }
     }
 
@@ -182,7 +185,7 @@ export default class FastPromise<T> {
     }
 
     protected static timeoutSended = false;
-    protected static unhandledPromisesList = [];
+    protected static unhandledPromisesList: FastPromise<any>[] = [];
     protected static unhandledPromisesLen = 0;
 
     protected static throwUnhandledRejectionCallback() {
@@ -195,7 +198,7 @@ export default class FastPromise<T> {
                     if (promise.value instanceof Error) {
                         throw promise.value;
                     } else {
-                        throw new Error("Uncaught in promise with error: " + JSON.stringify(promise.value));
+                        throw new Error('Uncaught in promise with error: ' + JSON.stringify(promise.value));
                     }
                 }
             }
@@ -358,38 +361,37 @@ export default class FastPromise<T> {
         const promise = new FastPromise<any>();
         const arr = new Array(array.length);
         const allCtx = {counter: 0, promise, arr};
+        const promises: FastPromise<any>[] = new Array(arr.length);
         for (let i = 0; i < array.length; i++) {
             const value = array[i];
             if (typeof value === 'object' && value !== null && (value as FastPromise<{}>).then === FastPromise.prototype.then) {
                 allCtx.counter++;
-                const ctx: PAllContext = {allCtx, i};
-                (value as FastPromise<{}>).then(FastPromise.allResolve, FastPromise.allReject, ctx);
+                promises[i] = value as FastPromise<any>;
             } else {
+                promises[i] = null;
                 arr[i] = value;
             }
         }
+        for (let i = 0; i < array.length; i++) {
+            if (promises[i]) {
+                (array[i] as FastPromise<{}>).then(FastPromise.allResolve, FastPromise.allReject, {allCtx, i});
+            }
+        }
+
         if (!array.length) {
             promise.resolve([]);
         }
         return promise;
     }
 
-    /*    static map(array: any[], iterator: (val: any)=>P<any>, initialValue: any, thisArg?: This) {
-     let promise = P.resolve(initialValue);
-     for (let i = 0; i < array.length; i++) {
-     promise = promise.then(iterator, null, thisArg, array[i]);
-     }
-     return promise;
-     }*/
-
     static race<TAll>(array: (TAll | FastPromise<TAll>)[]) {
-        const promise = new FastPromise<Opt<TAll>>();
+        const promise = new FastPromise<TAll>();
         for (let i = 0; i < array.length; i++) {
-            const item = array[i];
-            if (item instanceof FastPromise) {
-                item.then(promise.resolve, promise.reject, promise);
+            const value = array[i];
+            if (typeof value === 'object' && value !== null && (value as FastPromise<{}>).then === FastPromise.prototype.then) {
+                (value as FastPromise<{}>).then(promise.resolve, promise.reject, promise);
             } else {
-                promise.resolve(item);
+                promise.resolve(value);
                 break;
             }
         }
@@ -404,83 +406,11 @@ export default class FastPromise<T> {
     static onUnhandledRejection(fn: Opt<(reason: any) => void>) {
         FastPromise.unhandledRejection = fn;
     }
-}
-// to fast check nonexistent props
-// const proto = FastPromise.prototype;
-// proto.onFulfill = void 0;
-// proto.onReject = void 0;
-// proto.thisArg = void 0;
-// proto.onCancelCallback = void 0;
-// proto.skipProcess = false;
-// proto.children = void 0;
-// proto.firstChild = void 0;
+};
 
 interface PAllContext {
-    allCtx: {arr: {}[]; promise: FastPromise<any>; counter: number};
+    allCtx: { arr: {}[]; promise: FastPromise<any>; counter: number };
     i: number
 }
-//
-if (!console.profile) {
-    console.profile = function () {}
-    console.profileEnd = function () {}
-}
 
-
-/*
-function dd() {
-    return FastPromise.reject(2);
-}
-
-function catched() {
-    return FastPromise.resolve(1);
-}
-
-function executor(resolve, reject) {
-    resolve(1);
-    reject("");
-}
-
-function nextThen() {
-
-}
-
-
-for (let i = 0; i < 500; i++) {
-    const p = new FastPromise(executor)
-    p.then(dd, catched, {}).catch(catched);
-    p.then(nextThen).then(nextThen)
-}*/
-
-import "./Promise.spec";
-
-const blobIdP = FastPromise.resolve(true);
-const fileP = FastPromise.resolve(true);
-const createQuery = () => FastPromise.resolve(true);
-const insert = () => FastPromise.resolve(true);
-const whereUpdate = () => FastPromise.resolve(true);
-
-console.profile('perf');
-console.time('perf');
-for (let i = 0; i < 100000; i++) {
-    abc();
-}
-console.timeEnd('perf');
-(console as any).profileEnd('perf');
-
-
-
-function abc() {
-    FastPromise.all([blobIdP, fileP]).then(function (result) {
-        const blobId = result[0];
-        const fileV = result[1];
-    }).then(function () {
-        return createQuery().then(function () {}).then(function () {});
-    }).then(function () {
-        return insert();
-    }).then(function () {
-        return whereUpdate();
-    }).then(function () {
-    }, function (err) {
-    });
-}
-
+// import './Promise.spec';
