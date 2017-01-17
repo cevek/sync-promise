@@ -350,6 +350,14 @@ function test27() {
     p3.resolve(3);
     check(test27, calls, [0, 1, 2, 3, 4]);
 }
+function test28() {
+    const calls: number[] = [];
+    const p1 = FastPromise.resolve(1);
+    const p2 = new FastPromise();
+    p1.then(()=>p2).then(v => calls.push(v));
+    p2.cancel();
+    check(test28, calls, []);
+}
 
 
 test1();
@@ -379,3 +387,4 @@ test24();
 test25();
 test26();
 test27();
+test28();
