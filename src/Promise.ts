@@ -13,7 +13,7 @@ export const enum FastPromiseState{
 
 // test in browser
 declare const exports: any;
-if (typeof exports == 'undefined') {
+if (typeof exports === 'undefined') {
     (window as any).module = {exports: {}};
     (window as any).exports = {};
 }
@@ -35,7 +35,7 @@ export default class FastPromise<T> {
             ps[pos] = this;
             ps[pos + 1] = this.firstChild;
             pos += 2;
-            this.firstChild = null;
+            // this.firstChild = void 0;
             FastPromise.promiseStackPos = pos;
             if (!FastPromise.promiseRunnerInWork) {
                 FastPromise.promiseRunner();
@@ -56,7 +56,7 @@ export default class FastPromise<T> {
             ps[pos + 1] = childPromise;
             pos += 2;
         }
-        this.children = null;
+        // this.children = null;
         FastPromise.promiseStackPos = pos;
         if (!FastPromise.promiseRunnerInWork) {
             FastPromise.promiseRunner();
@@ -247,19 +247,19 @@ export default class FastPromise<T> {
     }
 
     isResolved() {
-        return this.state == FastPromiseState.RESOLVED;
+        return this.state === FastPromiseState.RESOLVED;
     }
 
     isRejected() {
-        return this.state == FastPromiseState.REJECTED;
+        return this.state === FastPromiseState.REJECTED;
     }
 
     isCancelled() {
-        return this.state == FastPromiseState.CANCELLED;
+        return this.state === FastPromiseState.CANCELLED;
     }
 
     isPending() {
-        return this.state == FastPromiseState.PENDING;
+        return this.state === FastPromiseState.PENDING;
     }
 
     cancel() {
@@ -270,14 +270,14 @@ export default class FastPromise<T> {
         }
         if (this.firstChild) {
             this.firstChild.cancel();
-            this.firstChild = null;
+            // this.firstChild = null;
         }
         if (this.children) {
             for (let i = 0; i < this.children.length; i++) {
                 const child = this.children[i];
                 child.cancel();
             }
-            this.children = null;
+            // this.children = null;
         }
     }
 
@@ -348,7 +348,7 @@ export default class FastPromise<T> {
 
     private static allResolve(this: PAllContext, val: any) {
         this.allCtx.arr[this.i] = val;
-        if (--this.allCtx.counter == 0) {
+        if (--this.allCtx.counter === 0) {
             this.allCtx.promise.resolve(this.allCtx.arr);
         }
     }
@@ -395,7 +395,7 @@ export default class FastPromise<T> {
                 break;
             }
         }
-        if (array.length == 0) {
+        if (array.length === 0) {
             promise.resolve(null);
         }
         return promise;
