@@ -125,7 +125,13 @@ export default class FastPromise<T> {
         if (this.state !== FastPromiseState.PENDING) {
             return this;
         }
-        let v = this.fullfill(value);
+        let v;
+        try {
+            v = this.fullfill(value);
+        } catch (e) {
+            this._reject(e);
+            return this;
+        }
         if (typeof v === 'object' && v !== null && typeof v.then === 'function') {
             if (v.then === FastPromise.prototype.then) {
                 v.innerThen(this);
@@ -223,7 +229,13 @@ export default class FastPromise<T> {
         if (this.state !== FastPromiseState.PENDING) {
             return this;
         }
-        let v = this.callReject(reason);
+        let v;
+        try {
+            v = this.callReject(reason);
+        } catch (e) {
+            this._reject(e);
+            return this;
+        }
         if (typeof v === 'object' && v !== null && typeof v.then === 'function') {
             if (v.then === FastPromise.prototype.then) {
                 v.innerThen(this);
