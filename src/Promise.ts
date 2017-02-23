@@ -144,6 +144,24 @@ export default class FastPromise<T> {
         return this;
     }
 
+    /*@internal*/
+    resolveWithoutTryCatch(value?: T | FastPromise<T>) {
+        if (this.state !== FastPromiseState.PENDING) {
+            return this;
+        }
+        const v = this.fullfill(value);
+        if (typeof v === 'object' && v !== null && typeof v.then === 'function') {
+            if (v.then === FastPromise.prototype.then) {
+                v.innerThen(this);
+            } else {
+                v.then(this._resolve.bind(this), this._reject.bind(this));
+            }
+        } else {
+            this._resolve(v as T);
+        }
+        return this;
+    }
+
     protected fullfill(value: any) {
         let newValue: any;
         if (!this.skipProcess && this.onFulfill) {
@@ -236,6 +254,24 @@ export default class FastPromise<T> {
             this._reject(e);
             return this;
         }
+        if (typeof v === 'object' && v !== null && typeof v.then === 'function') {
+            if (v.then === FastPromise.prototype.then) {
+                v.innerThen(this);
+            } else {
+                v.then(this._resolve.bind(this), this._reject.bind(this));
+            }
+            return this;
+        }
+        this._reject(v as T, !!this.onReject && !this.skipProcess);
+        return this;
+    }
+
+    /*@internal*/
+    rejectWithoutTryCatch(reason: T | Error) {
+        if (this.state !== FastPromiseState.PENDING) {
+            return this;
+        }
+        const v = this.callReject(reason);
         if (typeof v === 'object' && v !== null && typeof v.then === 'function') {
             if (v.then === FastPromise.prototype.then) {
                 v.innerThen(this);
@@ -417,6 +453,11 @@ export default class FastPromise<T> {
 
     static onUnhandledRejection(fn: Opt<(reason: any) => void>) {
         FastPromise.unhandledRejection = fn;
+    }
+
+    static skipTryCatch() {
+        FastPromise.prototype.resolve = FastPromise.prototype.resolveWithoutTryCatch;
+        FastPromise.prototype.reject = FastPromise.prototype.rejectWithoutTryCatch;
     }
 };
 
